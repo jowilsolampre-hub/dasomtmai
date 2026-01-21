@@ -6,6 +6,16 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
 
+/* Safe area insets for notched devices (iPhone X+, Android cutouts) */
+html {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
 @layer base {
   :root {
     /* Core Colors - Cyberpunk Palette */
@@ -68,9 +78,7 @@
     --sidebar-border: 200 30% 15%;
     --sidebar-ring: 185 100% 50%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
@@ -81,6 +89,7 @@
       radial-gradient(ellipse at top, hsl(210 40% 8%) 0%, transparent 50%),
       radial-gradient(ellipse at bottom, hsl(200 35% 6%) 0%, transparent 50%);
     min-height: 100vh;
+    min-height: 100dvh;
   }
   
   /* Scrollbar Styling */
@@ -271,17 +280,19 @@
     100% { background-position: 0 100%; }
   }
   
-  /* Glitch Effect */
-  .glitch {
-    animation: glitch 0.3s infinite;
+  /* Floating Action Button Pulse */
+  .animate-pulse-glow {
+    animation: fab-pulse 2s ease-in-out infinite;
   }
   
-  @keyframes glitch {
-    0%, 100% { transform: translate(0); }
-    20% { transform: translate(-2px, 2px); }
-    40% { transform: translate(-2px, -2px); }
-    60% { transform: translate(2px, 2px); }
-    80% { transform: translate(2px, -2px); }
+  @keyframes fab-pulse {
+    0%, 100% { 
+      box-shadow: 0 0 15px hsl(var(--primary) / 0.5);
+    }
+    50% { 
+      box-shadow: 0 0 30px hsl(var(--primary) / 0.8),
+                  0 0 60px hsl(var(--primary) / 0.4);
+    }
   }
 }
 
@@ -345,5 +356,32 @@
     right: -1px;
     border-left: none;
     border-top: none;
+  }
+  
+  /* Safe area padding utilities */
+  .safe-area-inset-top {
+    padding-top: max(var(--sat), 12px);
+  }
+  
+  .safe-area-inset-bottom {
+    padding-bottom: max(var(--sab), 12px);
+  }
+  
+  .safe-area-inset-left {
+    padding-left: max(var(--sal), 12px);
+  }
+  
+  .safe-area-inset-right {
+    padding-right: max(var(--sar), 12px);
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
