@@ -19,7 +19,7 @@ const navItems = [
   { id: "diagnostics", icon: Activity, label: "Diagnostics" },
   { id: "security", icon: Shield, label: "Security" },
   { id: "optimizer", icon: HardDrive, label: "Optimize" },
-  { id: "schedule", icon: Calendar, label: "Schedule" },
+  { id: "voice", icon: Mic, label: "Voice" },
   { id: "settings", icon: Settings, label: "Settings" },
 ];
 

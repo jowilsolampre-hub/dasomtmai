@@ -7,6 +7,7 @@ import { SecurityScreen } from "./screens/SecurityScreen";
 import { OptimizerScreen } from "./screens/OptimizerScreen";
 import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
+import { VoiceScreen } from "./screens/VoiceScreen";
 
 export function DasomApp() {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -23,6 +24,8 @@ export function DasomApp() {
         return <OptimizerScreen />;
       case "schedule":
         return <ScheduleScreen />;
+      case "voice":
+        return <VoiceScreen />;
       case "settings":
         return <SettingsScreen />;
       default:

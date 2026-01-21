@@ -6,6 +6,7 @@ interface CyberCardProps {
   className?: string;
   variant?: "default" | "glow" | "holo";
   noPadding?: boolean;
+  onClick?: () => void;
 }
 
 export function CyberCard({
@@ -13,14 +14,17 @@ export function CyberCard({
   className,
   variant = "default",
   noPadding = false,
+  onClick,
 }: CyberCardProps) {
   return (
     <div
+      onClick={onClick}
       className={cn(
         "relative rounded-lg border border-primary/20 bg-card/80 backdrop-blur-sm",
         variant === "glow" && "border-glow",
         variant === "holo" && "holo-card",
         !noPadding && "p-4",
+        onClick && "cursor-pointer",
         className
       )}
     >
