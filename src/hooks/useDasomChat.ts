@@ -9,7 +9,11 @@ export type ChatMessage = {
   timestamp: Date;
 };
 
-export function useDasomChat(intent?: string) {
+interface UseDasomChatOptions {
+  onAssistantResponse?: (text: string) => void;
+}
+
+export function useDasomChat(intent?: string, options?: UseDasomChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -63,6 +67,10 @@ export function useDasomChat(intent?: string) {
         onDone: () => {
           setIsLoading(false);
           setIsStreaming(false);
+          // Call the callback with the full response
+          if (options?.onAssistantResponse && assistantContent) {
+            options.onAssistantResponse(assistantContent);
+          }
         },
         onError: (error) => {
           toast.error(error);
@@ -76,7 +84,7 @@ export function useDasomChat(intent?: string) {
       setIsLoading(false);
       setIsStreaming(false);
     }
-  }, [messages, isLoading, intent]);
+  }, [messages, isLoading, intent, options]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
