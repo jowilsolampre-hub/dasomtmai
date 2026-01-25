@@ -8,6 +8,7 @@ import { OptimizerScreen } from "./screens/OptimizerScreen";
 import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { VoiceScreen } from "./screens/VoiceScreen";
+import { DevicesScreen } from "./screens/DevicesScreen";
 
 export function DasomApp() {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -16,6 +17,8 @@ export function DasomApp() {
     switch (currentScreen) {
       case "home":
         return <HomeScreen />;
+      case "devices":
+        return <DevicesScreen />;
       case "diagnostics":
         return <DiagnosticsScreen />;
       case "security":
