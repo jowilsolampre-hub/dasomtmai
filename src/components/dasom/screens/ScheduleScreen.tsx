@@ -222,8 +222,19 @@ export function ScheduleScreen() {
 
       {/* Voice Input */}
       <CyberCard className="mt-4">
-        <div className="flex items-center gap-3">
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            const input = e.currentTarget.querySelector('input');
+            if (input?.value.trim()) {
+              sendMessage(input.value);
+              input.value = "";
+            }
+          }}
+          className="flex items-center gap-3"
+        >
           <Button
+            type="button"
             size="icon"
             variant="ghost"
             className="text-primary"
@@ -237,13 +248,13 @@ export function ScheduleScreen() {
             className="flex-1 bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground"
           />
           <Button
+            type="submit"
             size="icon"
             className="bg-primary text-primary-foreground"
-            onClick={() => sendMessage("Add a new task to my schedule")}
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
-        </div>
+        </form>
       </CyberCard>
     </div>
   );
