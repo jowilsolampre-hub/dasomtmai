@@ -184,12 +184,50 @@ export function VoiceScreen() {
     : voicePersonas.filter(v => v.category === selectedCategory);
 
   const handlePlayPreview = (voiceId: string) => {
+    const voice = voicePersonas.find(v => v.id === voiceId);
+    if (!voice) return;
+
     if (playingVoice === voiceId) {
+      window.speechSynthesis.cancel();
       setPlayingVoice(null);
     } else {
+      // Stop any current speech
+      window.speechSynthesis.cancel();
       setPlayingVoice(voiceId);
-      // Simulate voice preview duration
-      setTimeout(() => setPlayingVoice(null), 3000);
+      
+      // Create speech utterance
+      const utterance = new SpeechSynthesisUtterance(
+        `Hello, I am ${voice.name}. ${voice.description}. How may I assist you today?`
+      );
+      
+      // Try to find a matching voice
+      const voices = window.speechSynthesis.getVoices();
+      const matchingVoice = voices.find(v => 
+        v.name.toLowerCase().includes(voice.accent.toLowerCase()) ||
+        v.lang.toLowerCase().includes(voice.accent.toLowerCase())
+      );
+      if (matchingVoice) {
+        utterance.voice = matchingVoice;
+      }
+      
+      utterance.onend = () => setPlayingVoice(null);
+      utterance.onerror = () => setPlayingVoice(null);
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleApplyVoice = () => {
+    const voice = voicePersonas.find(v => v.id === selectedVoice);
+    if (voice) {
+      // Store selected voice preference
+      localStorage.setItem('dasom-voice-persona', JSON.stringify(voice));
+      
+      // Announce the change
+      const utterance = new SpeechSynthesisUtterance(
+        `Voice persona changed to ${voice.name}. Neural sync complete.`
+      );
+      window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -390,6 +428,7 @@ export function VoiceScreen() {
         <Button
           className="w-full h-14 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-orbitron"
           disabled={!selectedVoice}
+          onClick={handleApplyVoice}
         >
           <Mic className="w-5 h-5 mr-2" />
           APPLY VOICE PERSONA
