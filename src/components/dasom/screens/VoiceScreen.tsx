@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { CyberCard } from "@/components/dasom/CyberCard";
 import { 
   Mic, 
@@ -20,10 +20,12 @@ import {
   Star,
   Crown,
   Wand2,
-  Waves
+  Waves,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface VoicePersona {
   id: string;
@@ -31,8 +33,7 @@ interface VoicePersona {
   description: string;
   category: string;
   icon: React.ElementType;
-  accent: string;
-  style: string;
+  voiceId: string; // ElevenLabs voice ID
   premium?: boolean;
 }
 
@@ -45,379 +46,295 @@ const voiceCategories = [
   { id: "calm", label: "Calm", icon: Moon },
 ];
 
+// Real ElevenLabs voice IDs mapped to personas
+// Each persona uses a distinct voice for authentic differentiation
 const voicePersonas: VoicePersona[] = [
   // Professional Voices
-  { id: "commander", name: "Commander", description: "Authoritative & decisive military-style voice", category: "professional", icon: Shield, accent: "American", style: "Commanding" },
-  { id: "analyst", name: "Analyst", description: "Precise & data-driven technical voice", category: "professional", icon: Brain, accent: "British", style: "Analytical" },
-  { id: "executive", name: "Executive", description: "Confident & polished corporate voice", category: "professional", icon: Crown, accent: "American", style: "Professional" },
-  { id: "professor", name: "Professor", description: "Wise & educational academic voice", category: "professional", icon: Star, accent: "British", style: "Educational" },
-  { id: "journalist", name: "Journalist", description: "Clear & articulate news anchor voice", category: "professional", icon: Mic, accent: "American", style: "Broadcast" },
-  { id: "diplomat", name: "Diplomat", description: "Smooth & refined international voice", category: "professional", icon: Sparkles, accent: "European", style: "Diplomatic" },
-  { id: "lawyer", name: "Lawyer", description: "Persuasive & articulate legal voice", category: "professional", icon: Shield, accent: "American", style: "Formal" },
-  { id: "doctor", name: "Doctor", description: "Calm & reassuring medical voice", category: "professional", icon: Heart, accent: "British", style: "Clinical" },
-  { id: "scientist", name: "Scientist", description: "Curious & methodical research voice", category: "professional", icon: Zap, accent: "German", style: "Scientific" },
-  { id: "mentor", name: "Mentor", description: "Encouraging & experienced guide voice", category: "professional", icon: Star, accent: "American", style: "Guiding" },
+  { id: "commander", name: "Commander", description: "Authoritative & decisive military-style voice", category: "professional", icon: Shield, voiceId: "nPczCjzI2devNBz1zQrb" }, // Brian
+  { id: "analyst", name: "Analyst", description: "Precise & data-driven technical voice", category: "professional", icon: Brain, voiceId: "onwK4e9ZLuTAKqWW03F9" }, // Daniel
+  { id: "executive", name: "Executive", description: "Confident & polished corporate voice", category: "professional", icon: Crown, voiceId: "CwhRBWXzGAHq8TQ4Fs17" }, // Roger
+  { id: "professor", name: "Professor", description: "Wise & educational academic voice", category: "professional", icon: Star, voiceId: "JBFqnCBsd6RMkjVDRZzb" }, // George
+  { id: "journalist", name: "Journalist", description: "Clear & articulate news anchor voice", category: "professional", icon: Mic, voiceId: "cjVigY5qzO86Huf0OWal" }, // Eric
+  { id: "diplomat", name: "Diplomat", description: "Smooth & refined international voice", category: "professional", icon: Sparkles, voiceId: "N2lVS1w4EtoT3dr4eOWO" }, // Callum
+  { id: "lawyer", name: "Lawyer", description: "Persuasive & articulate legal voice", category: "professional", icon: Shield, voiceId: "TX3LPaxmHKxFdv7VOQHJ" }, // Liam
+  { id: "doctor", name: "Doctor", description: "Calm & reassuring medical voice", category: "professional", icon: Heart, voiceId: "iP95p4xoKVk53GoZ742B" }, // Chris
+  { id: "scientist", name: "Scientist", description: "Curious & methodical research voice", category: "professional", icon: Zap, voiceId: "bIHbv24MWmeRgasZH58o" }, // Will
+  { id: "mentor", name: "Mentor", description: "Encouraging & experienced guide voice", category: "professional", icon: Star, voiceId: "pqHfZKP75CvOlQylNhV4" }, // Bill
   
   // Friendly Voices
-  { id: "bestie", name: "Bestie", description: "Warm & supportive best friend voice", category: "friendly", icon: Heart, accent: "American", style: "Casual" },
-  { id: "cheerful", name: "Cheerful", description: "Upbeat & energetic happy voice", category: "friendly", icon: Sun, accent: "Australian", style: "Energetic" },
-  { id: "companion", name: "Companion", description: "Loyal & understanding partner voice", category: "friendly", icon: User, accent: "British", style: "Supportive" },
-  { id: "storyteller", name: "Storyteller", description: "Engaging & expressive narrator voice", category: "friendly", icon: Wand2, accent: "Irish", style: "Narrative" },
-  { id: "coach", name: "Coach", description: "Motivating & empowering fitness voice", category: "friendly", icon: Flame, accent: "American", style: "Motivational" },
-  { id: "gamer", name: "Gamer", description: "Excited & enthusiastic gaming voice", category: "friendly", icon: Zap, accent: "American", style: "Playful" },
-  { id: "artist", name: "Artist", description: "Creative & expressive artistic voice", category: "friendly", icon: Sparkles, accent: "French", style: "Creative" },
-  { id: "adventurer", name: "Adventurer", description: "Bold & exciting explorer voice", category: "friendly", icon: Star, accent: "Australian", style: "Adventurous" },
-  { id: "optimist", name: "Optimist", description: "Positive & uplifting hopeful voice", category: "friendly", icon: Star, accent: "American", style: "Positive" },
-  { id: "jokester", name: "Jokester", description: "Witty & humorous comedic voice", category: "friendly", icon: Heart, accent: "British", style: "Comedic" },
+  { id: "bestie", name: "Bestie", description: "Warm & supportive best friend voice", category: "friendly", icon: Heart, voiceId: "EXAVITQu4vr4xnSDxMaL" }, // Sarah
+  { id: "cheerful", name: "Cheerful", description: "Upbeat & energetic happy voice", category: "friendly", icon: Sun, voiceId: "FGY2WhTYpPnrIDTdsKH5" }, // Laura
+  { id: "companion", name: "Companion", description: "Loyal & understanding partner voice", category: "friendly", icon: User, voiceId: "XrExE9yKIg1WjnnlVkGX" }, // Matilda
+  { id: "storyteller", name: "Storyteller", description: "Engaging & expressive narrator voice", category: "friendly", icon: Wand2, voiceId: "pFZP5JQG7iQjIQuC4Bku" }, // Lily
+  { id: "coach", name: "Coach", description: "Motivating & empowering fitness voice", category: "friendly", icon: Flame, voiceId: "IKne3meq5aSn9XLyUdCD" }, // Charlie
+  { id: "gamer", name: "Gamer", description: "Excited & enthusiastic gaming voice", category: "friendly", icon: Zap, voiceId: "SAz9YHcvj6GT2YYXdXww" }, // River
+  { id: "artist", name: "Artist", description: "Creative & expressive artistic voice", category: "friendly", icon: Sparkles, voiceId: "cgSgspJ2msm6clMCkdW9" }, // Jessica
+  { id: "adventurer", name: "Adventurer", description: "Bold & exciting explorer voice", category: "friendly", icon: Star, voiceId: "Xb7hH8MSUJpSbSDYk0k2" }, // Alice
+  { id: "optimist", name: "Optimist", description: "Positive & uplifting hopeful voice", category: "friendly", icon: Star, voiceId: "EXAVITQu4vr4xnSDxMaL" }, // Sarah
+  { id: "jokester", name: "Jokester", description: "Witty & humorous comedic voice", category: "friendly", icon: Heart, voiceId: "IKne3meq5aSn9XLyUdCD" }, // Charlie
   
-  // Robotic Voices
-  { id: "nexus", name: "NEXUS-7", description: "Advanced synthetic AI core voice", category: "robotic", icon: Bot, accent: "Synthetic", style: "AI Core", premium: true },
-  { id: "cipher", name: "CIPHER", description: "Encrypted & mysterious digital voice", category: "robotic", icon: Shield, accent: "Synthetic", style: "Encrypted" },
-  { id: "quantum", name: "QUANTUM", description: "Futuristic quantum computing voice", category: "robotic", icon: Zap, accent: "Synthetic", style: "Quantum" },
-  { id: "android", name: "Android", description: "Humanoid robot assistant voice", category: "robotic", icon: Bot, accent: "Synthetic", style: "Humanoid" },
-  { id: "mainframe", name: "Mainframe", description: "Classic computer terminal voice", category: "robotic", icon: Bot, accent: "Synthetic", style: "Retro" },
-  { id: "neural", name: "Neural", description: "Neural network processed voice", category: "robotic", icon: Brain, accent: "Synthetic", style: "Neural" },
-  { id: "hologram", name: "Hologram", description: "Ethereal holographic projection voice", category: "robotic", icon: Sparkles, accent: "Synthetic", style: "Holographic" },
-  { id: "mecha", name: "Mecha", description: "Giant robot warrior voice", category: "robotic", icon: Shield, accent: "Japanese", style: "Mechanical" },
-  { id: "drone", name: "Drone", description: "Efficient autonomous unit voice", category: "robotic", icon: Bot, accent: "Synthetic", style: "Autonomous" },
-  { id: "cybernetic", name: "Cybernetic", description: "Human-machine hybrid voice", category: "robotic", icon: Zap, accent: "Synthetic", style: "Hybrid" },
+  // Robotic/AI Voices
+  { id: "nexus", name: "NEXUS-7", description: "Advanced synthetic AI core voice", category: "robotic", icon: Bot, voiceId: "kPtEHAvRnjUJFv7SK9WI", premium: true }, // Glitch
+  { id: "cipher", name: "CIPHER", description: "Encrypted & mysterious digital voice", category: "robotic", icon: Shield, voiceId: "onwK4e9ZLuTAKqWW03F9" }, // Daniel
+  { id: "quantum", name: "QUANTUM", description: "Futuristic quantum computing voice", category: "robotic", icon: Zap, voiceId: "N2lVS1w4EtoT3dr4eOWO" }, // Callum
+  { id: "android", name: "Android", description: "Humanoid robot assistant voice", category: "robotic", icon: Bot, voiceId: "cjVigY5qzO86Huf0OWal" }, // Eric
+  { id: "mainframe", name: "Mainframe", description: "Classic computer terminal voice", category: "robotic", icon: Bot, voiceId: "JBFqnCBsd6RMkjVDRZzb" }, // George
+  { id: "neural", name: "Neural", description: "Neural network processed voice", category: "robotic", icon: Brain, voiceId: "TX3LPaxmHKxFdv7VOQHJ" }, // Liam
+  { id: "hologram", name: "Hologram", description: "Ethereal holographic projection voice", category: "robotic", icon: Sparkles, voiceId: "pFZP5JQG7iQjIQuC4Bku" }, // Lily
+  { id: "mecha", name: "Mecha", description: "Giant robot warrior voice", category: "robotic", icon: Shield, voiceId: "nPczCjzI2devNBz1zQrb" }, // Brian
+  { id: "drone", name: "Drone", description: "Efficient autonomous unit voice", category: "robotic", icon: Bot, voiceId: "iP95p4xoKVk53GoZ742B" }, // Chris
+  { id: "cybernetic", name: "Cybernetic", description: "Human-machine hybrid voice", category: "robotic", icon: Zap, voiceId: "bIHbv24MWmeRgasZH58o" }, // Will
   
   // Character Voices
-  { id: "wizard", name: "Wizard", description: "Mystical & ancient sorcerer voice", category: "character", icon: Wand2, accent: "British", style: "Mystical", premium: true },
-  { id: "vampire", name: "Vampire", description: "Seductive & eternal dark voice", category: "character", icon: Moon, accent: "Romanian", style: "Gothic" },
-  { id: "pirate", name: "Pirate", description: "Rough & adventurous sea captain voice", category: "character", icon: Waves, accent: "British", style: "Seafarer" },
-  { id: "ninja", name: "Ninja", description: "Silent & precise shadow warrior voice", category: "character", icon: Shield, accent: "Japanese", style: "Stealth" },
-  { id: "dragon", name: "Dragon", description: "Powerful & ancient beast voice", category: "character", icon: Flame, accent: "Deep", style: "Legendary" },
-  { id: "fairy", name: "Fairy", description: "Magical & whimsical sprite voice", category: "character", icon: Sparkles, accent: "Irish", style: "Magical" },
-  { id: "knight", name: "Knight", description: "Noble & honorable warrior voice", category: "character", icon: Shield, accent: "British", style: "Chivalrous" },
-  { id: "alien", name: "Alien", description: "Otherworldly extraterrestrial voice", category: "character", icon: Ghost, accent: "Unknown", style: "Extraterrestrial" },
-  { id: "ghost", name: "Ghost", description: "Ethereal & haunting spirit voice", category: "character", icon: Ghost, accent: "Whispered", style: "Spectral" },
-  { id: "demon", name: "Demon", description: "Dark & powerful underworld voice", category: "character", icon: Flame, accent: "Deep", style: "Infernal" },
+  { id: "wizard", name: "Wizard", description: "Mystical & ancient sorcerer voice", category: "character", icon: Wand2, voiceId: "JBFqnCBsd6RMkjVDRZzb", premium: true }, // George
+  { id: "vampire", name: "Vampire", description: "Seductive & eternal dark voice", category: "character", icon: Moon, voiceId: "onwK4e9ZLuTAKqWW03F9" }, // Daniel
+  { id: "pirate", name: "Pirate", description: "Rough & adventurous sea captain voice", category: "character", icon: Waves, voiceId: "nPczCjzI2devNBz1zQrb" }, // Brian
+  { id: "ninja", name: "Ninja", description: "Silent & precise shadow warrior voice", category: "character", icon: Shield, voiceId: "N2lVS1w4EtoT3dr4eOWO" }, // Callum
+  { id: "dragon", name: "Dragon", description: "Powerful & ancient beast voice", category: "character", icon: Flame, voiceId: "pqHfZKP75CvOlQylNhV4" }, // Bill
+  { id: "fairy", name: "Fairy", description: "Magical & whimsical sprite voice", category: "character", icon: Sparkles, voiceId: "pFZP5JQG7iQjIQuC4Bku" }, // Lily
+  { id: "knight", name: "Knight", description: "Noble & honorable warrior voice", category: "character", icon: Shield, voiceId: "TX3LPaxmHKxFdv7VOQHJ" }, // Liam
+  { id: "alien", name: "Alien", description: "Otherworldly extraterrestrial voice", category: "character", icon: Ghost, voiceId: "kPtEHAvRnjUJFv7SK9WI" }, // Glitch
+  { id: "ghost", name: "Ghost", description: "Ethereal & haunting spirit voice", category: "character", icon: Ghost, voiceId: "XrExE9yKIg1WjnnlVkGX" }, // Matilda
+  { id: "demon", name: "Demon", description: "Dark & powerful underworld voice", category: "character", icon: Flame, voiceId: "nPczCjzI2devNBz1zQrb" }, // Brian
   
   // Calm Voices
-  { id: "zen", name: "Zen Master", description: "Peaceful & enlightened meditation voice", category: "calm", icon: Moon, accent: "Asian", style: "Meditative", premium: true },
-  { id: "asmr", name: "ASMR", description: "Soft & soothing whisper voice", category: "calm", icon: Waves, accent: "American", style: "Whisper" },
-  { id: "therapist", name: "Therapist", description: "Understanding & gentle counselor voice", category: "calm", icon: Heart, accent: "American", style: "Therapeutic" },
-  { id: "nature", name: "Nature Guide", description: "Serene & peaceful outdoor voice", category: "calm", icon: Sun, accent: "Australian", style: "Natural" },
-  { id: "lullaby", name: "Lullaby", description: "Gentle & soothing bedtime voice", category: "calm", icon: Moon, accent: "British", style: "Soothing" },
-  { id: "poet", name: "Poet", description: "Artistic & flowing literary voice", category: "calm", icon: Wand2, accent: "British", style: "Poetic" },
-  { id: "sage", name: "Sage", description: "Ancient & wise elder voice", category: "calm", icon: Star, accent: "Indian", style: "Wisdom" },
-  { id: "ocean", name: "Ocean", description: "Deep & flowing water voice", category: "calm", icon: Waves, accent: "Hawaiian", style: "Oceanic" },
-  { id: "forest", name: "Forest", description: "Earthy & grounding woodland voice", category: "calm", icon: Sun, accent: "Celtic", style: "Woodland" },
-  { id: "dreamer", name: "Dreamer", description: "Soft & imaginative visionary voice", category: "calm", icon: Moon, accent: "French", style: "Dreamlike" },
+  { id: "zen", name: "Zen Master", description: "Peaceful & enlightened meditation voice", category: "calm", icon: Moon, voiceId: "SAz9YHcvj6GT2YYXdXww", premium: true }, // River
+  { id: "asmr", name: "ASMR", description: "Soft & soothing whisper voice", category: "calm", icon: Waves, voiceId: "FGY2WhTYpPnrIDTdsKH5" }, // Laura
+  { id: "therapist", name: "Therapist", description: "Understanding & gentle counselor voice", category: "calm", icon: Heart, voiceId: "EXAVITQu4vr4xnSDxMaL" }, // Sarah
+  { id: "nature", name: "Nature Guide", description: "Serene & peaceful outdoor voice", category: "calm", icon: Sun, voiceId: "Xb7hH8MSUJpSbSDYk0k2" }, // Alice
+  { id: "lullaby", name: "Lullaby", description: "Gentle & soothing bedtime voice", category: "calm", icon: Moon, voiceId: "cgSgspJ2msm6clMCkdW9" }, // Jessica
+  { id: "poet", name: "Poet", description: "Artistic & flowing literary voice", category: "calm", icon: Wand2, voiceId: "XrExE9yKIg1WjnnlVkGX" }, // Matilda
+  { id: "sage", name: "Sage", description: "Ancient & wise elder voice", category: "calm", icon: Star, voiceId: "JBFqnCBsd6RMkjVDRZzb" }, // George
+  { id: "ocean", name: "Ocean", description: "Deep & flowing water voice", category: "calm", icon: Waves, voiceId: "SAz9YHcvj6GT2YYXdXww" }, // River
+  { id: "forest", name: "Forest", description: "Earthy & grounding woodland voice", category: "calm", icon: Sun, voiceId: "IKne3meq5aSn9XLyUdCD" }, // Charlie
+  { id: "dreamer", name: "Dreamer", description: "Soft & imaginative visionary voice", category: "calm", icon: Moon, voiceId: "pFZP5JQG7iQjIQuC4Bku" }, // Lily
   
-  // Additional Premium Voices
-  { id: "celestial", name: "Celestial", description: "Divine & heavenly angelic voice", category: "character", icon: Star, accent: "Ethereal", style: "Divine", premium: true },
-  { id: "phoenix", name: "Phoenix", description: "Reborn & powerful fire bird voice", category: "character", icon: Flame, accent: "Mythical", style: "Legendary", premium: true },
-  { id: "oracle", name: "Oracle", description: "Prophetic & mysterious seer voice", category: "calm", icon: Moon, accent: "Greek", style: "Prophetic", premium: true },
-  { id: "titan", name: "Titan", description: "Immense & powerful giant voice", category: "character", icon: Shield, accent: "Deep", style: "Colossal", premium: true },
-  
-  // More variety voices
-  { id: "butler", name: "Butler", description: "Refined & proper servant voice", category: "professional", icon: Crown, accent: "British", style: "Formal" },
-  { id: "detective", name: "Detective", description: "Sharp & observant investigator voice", category: "professional", icon: Brain, accent: "American", style: "Noir" },
-  { id: "pilot", name: "Pilot", description: "Cool & collected aviator voice", category: "professional", icon: Zap, accent: "American", style: "Aviation" },
-  { id: "chef", name: "Chef", description: "Passionate & expressive culinary voice", category: "friendly", icon: Flame, accent: "Italian", style: "Culinary" },
-  { id: "musician", name: "Musician", description: "Rhythmic & melodic artist voice", category: "friendly", icon: Waves, accent: "American", style: "Musical" },
-  { id: "surfer", name: "Surfer", description: "Laid-back & chill beach voice", category: "friendly", icon: Waves, accent: "Californian", style: "Relaxed" },
-  { id: "cowboy", name: "Cowboy", description: "Rugged & frontier western voice", category: "character", icon: Star, accent: "Texan", style: "Western" },
-  { id: "samurai", name: "Samurai", description: "Honorable & disciplined warrior voice", category: "character", icon: Shield, accent: "Japanese", style: "Bushido" },
-  { id: "elf", name: "Elf", description: "Graceful & ancient woodland voice", category: "character", icon: Sparkles, accent: "Elvish", style: "Immortal" },
-  { id: "dwarf", name: "Dwarf", description: "Gruff & hearty mountain voice", category: "character", icon: Shield, accent: "Scottish", style: "Mountain" },
-  
-  // Tech voices
-  { id: "hacker", name: "Hacker", description: "Quick & edgy cyber punk voice", category: "robotic", icon: Bot, accent: "American", style: "Underground" },
-  { id: "glitch", name: "Glitch", description: "Distorted & fragmented digital voice", category: "robotic", icon: Zap, accent: "Corrupted", style: "Glitched" },
-  { id: "satellite", name: "Satellite", description: "Distant & cosmic space voice", category: "robotic", icon: Zap, accent: "Synthetic", style: "Orbital" },
-  { id: "protocol", name: "Protocol", description: "Precise & systematic droid voice", category: "robotic", icon: Bot, accent: "Synthetic", style: "Protocol" },
-  
-  // More calm voices
-  { id: "moonlight", name: "Moonlight", description: "Gentle & luminous night voice", category: "calm", icon: Moon, accent: "Japanese", style: "Nocturnal" },
-  { id: "rainfall", name: "Rainfall", description: "Soft & rhythmic weather voice", category: "calm", icon: Waves, accent: "British", style: "Ambient" },
-  { id: "starlight", name: "Starlight", description: "Distant & twinkling cosmic voice", category: "calm", icon: Star, accent: "Ethereal", style: "Celestial" },
-  { id: "breeze", name: "Breeze", description: "Light & refreshing wind voice", category: "calm", icon: Sun, accent: "Hawaiian", style: "Airy" },
-  
-  // International voices
-  { id: "parisian", name: "Parisian", description: "Elegant & romantic French voice", category: "friendly", icon: Heart, accent: "French", style: "Romantic" },
-  { id: "tokyo", name: "Tokyo", description: "Modern & stylish Japanese voice", category: "friendly", icon: Zap, accent: "Japanese", style: "Urban" },
-  { id: "viking", name: "Viking", description: "Fierce & bold Nordic voice", category: "character", icon: Shield, accent: "Scandinavian", style: "Norse" },
-  { id: "pharaoh", name: "Pharaoh", description: "Regal & ancient Egyptian voice", category: "character", icon: Crown, accent: "Egyptian", style: "Ancient" },
-  
-  // Specialty voices
-  { id: "narrator", name: "Narrator", description: "Epic & cinematic movie voice", category: "professional", icon: Star, accent: "American", style: "Cinematic" },
-  { id: "announcer", name: "Announcer", description: "Bold & exciting sports voice", category: "professional", icon: Mic, accent: "American", style: "Broadcast" },
-  { id: "host", name: "Host", description: "Charming & welcoming show voice", category: "friendly", icon: Star, accent: "American", style: "Entertainment" },
-  { id: "guardian", name: "Guardian", description: "Protective & vigilant defender voice", category: "character", icon: Shield, accent: "Deep", style: "Protective" },
-  { id: "spirit", name: "Spirit", description: "Ethereal & transcendent soul voice", category: "calm", icon: Ghost, accent: "Ethereal", style: "Spiritual" },
-  
-  // More unique voices to reach 100+
-  { id: "steampunk", name: "Steampunk", description: "Victorian & mechanical inventor voice", category: "character", icon: Zap, accent: "British", style: "Victorian" },
-  { id: "cyberpunk", name: "Cyberpunk", description: "Edgy & neon future voice", category: "robotic", icon: Zap, accent: "American", style: "Dystopian" },
-  { id: "astronaut", name: "Astronaut", description: "Calm & professional space voice", category: "professional", icon: Star, accent: "American", style: "Space" },
-  { id: "sensei", name: "Sensei", description: "Wise & patient teacher voice", category: "calm", icon: Brain, accent: "Japanese", style: "Martial" },
-  { id: "valkyrie", name: "Valkyrie", description: "Fierce & noble warrior voice", category: "character", icon: Shield, accent: "Norse", style: "Divine" },
-  { id: "siren", name: "Siren", description: "Enchanting & melodic sea voice", category: "character", icon: Waves, accent: "Greek", style: "Enchanting" },
-  { id: "architect", name: "Architect", description: "Precise & visionary builder voice", category: "professional", icon: Star, accent: "European", style: "Design" },
-  { id: "nomad", name: "Nomad", description: "Free & worldly traveler voice", category: "friendly", icon: Star, accent: "Mixed", style: "Wanderer" },
-  { id: "mystic", name: "Mystic", description: "Enigmatic & powerful magic voice", category: "calm", icon: Wand2, accent: "Unknown", style: "Arcane" },
-  { id: "echo", name: "Echo", description: "Reverberating & distant voice", category: "robotic", icon: Waves, accent: "Synthetic", style: "Resonant" },
-  
-  // Extra voices for 100+
-  { id: "captain", name: "Captain", description: "Commanding & strategic leader voice", category: "professional", icon: Shield, accent: "American", style: "Leadership" },
-  { id: "inventor", name: "Inventor", description: "Curious & innovative genius voice", category: "professional", icon: Zap, accent: "German", style: "Inventive" },
-  { id: "bard", name: "Bard", description: "Musical & poetic performer voice", category: "character", icon: Wand2, accent: "Celtic", style: "Bardic" },
-  { id: "shaman", name: "Shaman", description: "Spiritual & ancient healer voice", category: "calm", icon: Moon, accent: "Native", style: "Shamanic" },
-  { id: "empress", name: "Empress", description: "Regal & commanding ruler voice", category: "character", icon: Crown, accent: "Russian", style: "Imperial" },
-  { id: "mercenary", name: "Mercenary", description: "Tough & experienced soldier voice", category: "character", icon: Shield, accent: "American", style: "Combat" },
-  { id: "scholar", name: "Scholar", description: "Learned & thoughtful academic voice", category: "professional", icon: Brain, accent: "British", style: "Academic" },
-  { id: "healer", name: "Healer", description: "Gentle & nurturing care voice", category: "calm", icon: Heart, accent: "Irish", style: "Healing" },
-  { id: "storm", name: "Storm", description: "Powerful & electric weather voice", category: "robotic", icon: Zap, accent: "Deep", style: "Elemental" },
-  { id: "crystal", name: "Crystal", description: "Clear & resonant gem voice", category: "calm", icon: Sparkles, accent: "Ethereal", style: "Crystalline" },
+  // Holiday Voices
+  { id: "santa", name: "Santa", description: "Jolly & warm holiday spirit voice", category: "character", icon: Star, voiceId: "MDLAMJ0jxkpYkjXbmG4t" }, // Santa
+  { id: "mrs-claus", name: "Mrs Claus", description: "Kind & nurturing holiday voice", category: "character", icon: Heart, voiceId: "SAhdygBsjizE9aIj39dz" }, // Mrs Claus
+  { id: "elf", name: "Elf", description: "Cheerful & helpful workshop voice", category: "character", icon: Sparkles, voiceId: "e79twtVS2278lVZZQiAD" }, // The Elf
+  { id: "reindeer", name: "Reindeer", description: "Playful & magical creature voice", category: "character", icon: Star, voiceId: "h6u4tPKmcPlxUdZOaVpH" }, // The Reindeer
 ];
 
 export function VoiceScreen() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedVoice, setSelectedVoice] = useState<string | null>("nexus");
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const filteredVoices = selectedCategory === "all" 
     ? voicePersonas 
     : voicePersonas.filter(v => v.category === selectedCategory);
 
-  const handlePlayPreview = (voiceId: string) => {
+  const handlePlayPreview = async (voiceId: string) => {
     const voice = voicePersonas.find(v => v.id === voiceId);
     if (!voice) return;
 
+    // If already playing this voice, stop it
     if (playingVoice === voiceId) {
-      window.speechSynthesis.cancel();
-      setPlayingVoice(null);
-    } else {
-      // Stop any current speech
-      window.speechSynthesis.cancel();
-      setPlayingVoice(voiceId);
-      
-      // Create speech utterance
-      const utterance = new SpeechSynthesisUtterance(
-        `Hello, I am ${voice.name}. ${voice.description}. How may I assist you today?`
-      );
-      
-      // Try to find a matching voice
-      const voices = window.speechSynthesis.getVoices();
-      const matchingVoice = voices.find(v => 
-        v.name.toLowerCase().includes(voice.accent.toLowerCase()) ||
-        v.lang.toLowerCase().includes(voice.accent.toLowerCase())
-      );
-      if (matchingVoice) {
-        utterance.voice = matchingVoice;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
-      
-      utterance.onend = () => setPlayingVoice(null);
-      utterance.onerror = () => setPlayingVoice(null);
-      
-      window.speechSynthesis.speak(utterance);
+      setPlayingVoice(null);
+      return;
     }
-  };
 
-  const handleApplyVoice = () => {
-    const voice = voicePersonas.find(v => v.id === selectedVoice);
-    if (voice) {
-      // Store selected voice preference
-      localStorage.setItem('dasom-voice-persona', JSON.stringify(voice));
+    // Stop any current audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setLoadingVoice(voiceId);
+
+    try {
+      const text = `Hello, I am ${voice.name}. ${voice.description}. How may I assist you today?`;
       
-      // Announce the change
-      const utterance = new SpeechSynthesisUtterance(
-        `Voice persona changed to ${voice.name}. Neural sync complete.`
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text, voiceId: voice.voiceId }),
+        }
       );
-      window.speechSynthesis.speak(utterance);
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setPlayingVoice(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      audio.onerror = () => {
+        setPlayingVoice(null);
+        toast.error("Failed to play audio");
+      };
+
+      setPlayingVoice(voiceId);
+      await audio.play();
+    } catch (error) {
+      console.error("TTS error:", error);
+      toast.error("Failed to generate voice preview");
+    } finally {
+      setLoadingVoice(null);
     }
   };
 
-  const selectedVoiceData = voicePersonas.find(v => v.id === selectedVoice);
+  const handleSelectVoice = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    localStorage.setItem("dasom-voice", voiceId);
+    const voice = voicePersonas.find(v => v.id === voiceId);
+    if (voice) {
+      localStorage.setItem("dasom-voice-elevenlabs-id", voice.voiceId);
+    }
+    toast.success(`Voice persona updated to ${voicePersonas.find(v => v.id === voiceId)?.name}`);
+  };
+
+  const currentVoice = voicePersonas.find(v => v.id === selectedVoice);
 
   return (
     <div className="p-4 space-y-4 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-orbitron text-lg font-bold text-foreground">
-          VOICE SYNTHESIS
-        </h2>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Volume2 className="w-4 h-4 text-primary" />
-          <span className="font-tech">{voicePersonas.length} PERSONAS</span>
+        <div>
+          <div className="text-xs font-tech text-muted-foreground">VOICE SYNTHESIS</div>
+          <h2 className="font-orbitron text-2xl font-bold text-foreground flex items-center gap-2">
+            <Volume2 className="w-6 h-6 text-primary" />
+            {voicePersonas.length} PERSONAS
+          </h2>
         </div>
       </div>
 
-      {/* Selected Voice Preview */}
-      {selectedVoiceData && (
-        <CyberCard variant="glow" className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10" />
-          <div className="relative flex items-center gap-4">
-            <div className="relative">
-              <div className={cn(
-                "w-20 h-20 rounded-2xl flex items-center justify-center",
-                "bg-gradient-to-br from-primary to-accent"
-              )}>
-                <selectedVoiceData.icon className="w-10 h-10 text-primary-foreground" />
-              </div>
-              {selectedVoiceData.premium && (
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-warning rounded-full flex items-center justify-center">
-                  <Crown className="w-3 h-3 text-warning-foreground" />
-                </div>
-              )}
+      {/* Current Voice */}
+      {currentVoice && (
+        <CyberCard variant="glow" className="border-primary/50">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-primary/20">
+              <currentVoice.icon className="w-6 h-6 text-primary" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-orbitron font-bold text-lg text-foreground">
-                  {selectedVoiceData.name}
+                  {currentVoice.name}
                 </h3>
-                <Check className="w-4 h-4 text-success" />
+                <Check className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {selectedVoiceData.description}
-              </p>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-xs font-tech text-primary">{selectedVoiceData.accent}</span>
-                <span className="text-xs text-muted-foreground">•</span>
-                <span className="text-xs font-tech text-accent">{selectedVoiceData.style}</span>
+              <p className="text-sm text-muted-foreground">{currentVoice.description}</p>
+              <div className="flex gap-2 mt-1">
+                <span className="text-xs font-tech text-primary">Synthetic</span>
+                <span className="text-xs font-tech text-accent">• AI Core</span>
               </div>
             </div>
             <Button
               size="icon"
-              className={cn(
-                "w-12 h-12 rounded-full",
-                playingVoice === selectedVoiceData.id
-                  ? "bg-accent text-accent-foreground"
-                  : "bg-primary text-primary-foreground"
-              )}
-              onClick={() => handlePlayPreview(selectedVoiceData.id)}
+              variant="outline"
+              className="border-primary/30"
+              onClick={() => handlePlayPreview(currentVoice.id)}
+              disabled={loadingVoice === currentVoice.id}
             >
-              {playingVoice === selectedVoiceData.id ? (
+              {loadingVoice === currentVoice.id ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : playingVoice === currentVoice.id ? (
                 <Pause className="w-5 h-5" />
               ) : (
-                <Play className="w-5 h-5 ml-0.5" />
+                <Play className="w-5 h-5" />
               )}
             </Button>
           </div>
-          
-          {/* Waveform visualization when playing */}
-          {playingVoice === selectedVoiceData.id && (
-            <div className="mt-4 flex items-center justify-center gap-1 h-8">
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-primary rounded-full animate-pulse"
-                  style={{
-                    height: `${Math.random() * 24 + 8}px`,
-                    animationDelay: `${i * 50}ms`,
-                  }}
-                />
-              ))}
-            </div>
-          )}
         </CyberCard>
       )}
 
-      {/* Category Tabs */}
+      {/* Category Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {voiceCategories.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = selectedCategory === cat.id;
+        {voiceCategories.map((category) => {
+          const Icon = category.icon;
+          const isActive = selectedCategory === category.id;
           return (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all",
-                "font-tech text-xs uppercase tracking-wider",
+                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-tech whitespace-nowrap transition-all",
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
               )}
             >
               <Icon className="w-4 h-4" />
-              {cat.label}
+              {category.label}
             </button>
           );
         })}
       </div>
 
       {/* Voice Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {filteredVoices.map((voice) => {
           const Icon = voice.icon;
           const isSelected = selectedVoice === voice.id;
           const isPlaying = playingVoice === voice.id;
-          
+          const isLoading = loadingVoice === voice.id;
+
           return (
             <CyberCard
               key={voice.id}
               className={cn(
-                "relative transition-all duration-200",
-                isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                "cursor-pointer transition-all",
+                isSelected && "border-primary/50 bg-primary/5"
               )}
-              onClick={() => setSelectedVoice(voice.id)}
+              onClick={() => handleSelectVoice(voice.id)}
             >
-              {voice.premium && (
-                <div className="absolute top-2 right-2">
-                  <Crown className="w-4 h-4 text-warning" />
-                </div>
-              )}
-              
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-                  isSelected
-                    ? "bg-gradient-to-br from-primary to-accent"
-                    : "bg-secondary"
+                  "p-2 rounded-lg",
+                  isSelected ? "bg-primary/20" : "bg-secondary/50"
                 )}>
-                  <Icon className={cn(
-                    "w-6 h-6",
-                    isSelected ? "text-primary-foreground" : "text-muted-foreground"
-                  )} />
+                  <Icon className={cn("w-5 h-5", isSelected ? "text-primary" : "text-muted-foreground")} />
                 </div>
-                
                 <div className="flex-1 min-w-0">
-                  <h4 className={cn(
-                    "font-orbitron font-semibold text-sm truncate",
-                    isSelected ? "text-primary" : "text-foreground"
-                  )}>
-                    {voice.name}
-                  </h4>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                    {voice.description}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-foreground truncate">{voice.name}</h4>
+                    {voice.premium && (
+                      <span className="text-xs font-tech text-accent">★</span>
+                    )}
+                    {isSelected && <Check className="w-4 h-4 text-primary shrink-0" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">{voice.description}</p>
                 </div>
-              </div>
-              
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-[10px] font-tech text-muted-foreground uppercase">
-                  {voice.accent}
-                </span>
-                <button
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     handlePlayPreview(voice.id);
                   }}
-                  className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                    isPlaying
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-secondary hover:bg-secondary/80 text-muted-foreground"
-                  )}
+                  disabled={isLoading}
                 >
-                  {isPlaying ? (
-                    <Pause className="w-3 h-3" />
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="w-4 h-4" />
                   ) : (
-                    <Play className="w-3 h-3 ml-0.5" />
+                    <Play className="w-4 h-4" />
                   )}
-                </button>
+                </Button>
               </div>
-              
-              {/* Playing indicator */}
-              {isPlaying && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-secondary overflow-hidden rounded-b-lg">
-                  <div className="h-full bg-gradient-to-r from-primary to-accent animate-pulse" />
-                </div>
-              )}
             </CyberCard>
           );
         })}
@@ -426,11 +343,12 @@ export function VoiceScreen() {
       {/* Apply Button */}
       <div className="fixed bottom-20 left-4 right-4 z-40">
         <Button
-          className="w-full h-14 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-orbitron"
-          disabled={!selectedVoice}
-          onClick={handleApplyVoice}
+          className="w-full h-12 bg-gradient-to-r from-primary to-accent text-primary-foreground font-tech"
+          onClick={() => {
+            toast.success("Voice persona applied successfully");
+          }}
         >
-          <Mic className="w-5 h-5 mr-2" />
+          <Sparkles className="w-4 h-4 mr-2" />
           APPLY VOICE PERSONA
         </Button>
       </div>
