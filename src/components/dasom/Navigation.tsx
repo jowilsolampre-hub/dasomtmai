@@ -3,10 +3,11 @@ import {
   Home, 
   Activity, 
   Shield, 
-  HardDrive, 
   Settings,
   Mic,
-  Smartphone
+  Smartphone,
+  Mail,
+  Calendar
 } from "lucide-react";
 
 interface NavigationProps {
@@ -17,10 +18,10 @@ interface NavigationProps {
 const navItems = [
   { id: "home", icon: Home, label: "Home" },
   { id: "devices", icon: Smartphone, label: "Devices" },
+  { id: "inbox", icon: Mail, label: "Inbox" },
+  { id: "calendar", icon: Calendar, label: "Calendar" },
   { id: "diagnostics", icon: Activity, label: "Diagnostics" },
-  { id: "security", icon: Shield, label: "Security" },
   { id: "voice", icon: Mic, label: "Voice" },
-  { id: "settings", icon: Settings, label: "Settings" },
 ];
 
 export function Navigation({ currentScreen, onNavigate }: NavigationProps) {

@@ -9,6 +9,8 @@ import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { VoiceScreen } from "./screens/VoiceScreen";
 import { DevicesScreen } from "./screens/DevicesScreen";
+import { InboxScreen } from "./screens/InboxScreen";
+import { CalendarScreen } from "./screens/CalendarScreen";
 
 export function DasomApp() {
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -19,6 +21,10 @@ export function DasomApp() {
         return <HomeScreen />;
       case "devices":
         return <DevicesScreen />;
+      case "inbox":
+        return <InboxScreen />;
+      case "calendar":
+        return <CalendarScreen />;
       case "diagnostics":
         return <DiagnosticsScreen />;
       case "security":
