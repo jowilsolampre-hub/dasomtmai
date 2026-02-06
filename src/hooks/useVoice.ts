@@ -19,6 +19,20 @@ interface UseVoiceReturn {
   availableVoices: SpeechSynthesisVoice[];
 }
 
+const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+
+// Get the stored ElevenLabs voice ID from localStorage
+function getStoredVoiceId(): string {
+  try {
+    const stored = localStorage.getItem("dasom-voice-id");
+    if (stored) return stored;
+  } catch {
+    // ignore
+  }
+  // Default to "Brian" voice
+  return "nPczCjzI2devNBz1zQrb";
+}
+
 export function useVoice(config?: VoiceConfig): UseVoiceReturn {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -27,37 +41,11 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Check browser support
+  // Check browser support for speech recognition
   const isSupported = typeof window !== 'undefined' && 
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) &&
-    'speechSynthesis' in window;
-
-  // Initialize speech synthesis and get voices
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    synthRef.current = window.speechSynthesis;
-    
-    const loadVoices = () => {
-      const voices = synthRef.current?.getVoices() || [];
-      setAvailableVoices(voices);
-    };
-
-    loadVoices();
-    
-    // Chrome loads voices asynchronously
-    if (synthRef.current) {
-      synthRef.current.onvoiceschanged = loadVoices;
-    }
-
-    return () => {
-      if (synthRef.current) {
-        synthRef.current.cancel();
-      }
-    };
-  }, []);
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -71,7 +59,7 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = '';
         let interimTranscript = '';
 
@@ -87,7 +75,7 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
         setTranscript(finalTranscript || interimTranscript);
       };
 
-      recognitionRef.current.onerror = (event) => {
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         if (event.error !== 'aborted') {
           toast.error(`Voice input error: ${event.error}`);
@@ -107,12 +95,24 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
     };
   }, [isSupported]);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   const startListening = useCallback(() => {
     if (!recognitionRef.current || isListening) return;
     
     // Stop any ongoing speech
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setIsSpeaking(false);
     }
     
     setTranscript("");
@@ -138,52 +138,62 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
     setIsListening(false);
   }, []);
 
-  const speak = useCallback((text: string) => {
-    if (!synthRef.current || !text.trim()) return;
+  const speak = useCallback(async (text: string) => {
+    if (!text.trim()) return;
 
-    // Cancel any ongoing speech
-    synthRef.current.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Configure voice
-    utterance.rate = config?.rate ?? 1.0;
-    utterance.pitch = config?.pitch ?? 1.0;
-    utterance.volume = 1.0;
-
-    // Select voice based on config or use a good default
-    if (availableVoices.length > 0) {
-      // Try to find a preferred voice
-      let selectedVoice = availableVoices.find(v => 
-        v.name.includes(config?.selectedVoice || '') ||
-        v.name.includes('Samantha') || // iOS
-        v.name.includes('Google UK English Female') ||
-        v.name.includes('Microsoft Zira')
-      );
-      
-      // Fallback to first English voice
-      if (!selectedVoice) {
-        selectedVoice = availableVoices.find(v => v.lang.startsWith('en'));
-      }
-      
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
+    // Stop any ongoing speech
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      setIsSpeaking(false);
-    };
+    setIsSpeaking(true);
 
-    synthRef.current.speak(utterance);
-  }, [config, availableVoices]);
+    try {
+      const voiceId = getStoredVoiceId();
+      
+      const response = await fetch(TTS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text, voiceId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+      audioRef.current.onerror = () => {
+        console.error('Audio playback error');
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+      
+      await audioRef.current.play();
+    } catch (error) {
+      console.error('TTS error:', error);
+      setIsSpeaking(false);
+      // Fallback silently - don't show toast for TTS failures
+    }
+  }, []);
 
   const stopSpeaking = useCallback(() => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
     setIsSpeaking(false);
   }, []);
