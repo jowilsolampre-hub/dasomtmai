@@ -54,14 +54,18 @@ export function VoiceScreen() {
 
   const findBestVoice = (persona: VoicePersona): SpeechSynthesisVoice | null => {
     if (!voices.length) return null;
-    // Try exact name hint match first
+    const enVoices = voices.filter(v => v.lang.startsWith("en"));
+    const pool = enVoices.length ? enVoices : voices;
+
+    // Try name hint first
     if (persona.voiceNameHint) {
-      const hintMatch = voices.find(v => v.name.includes(persona.voiceNameHint!) && v.lang.startsWith(persona.voiceLang.split("-")[0]));
+      const hintMatch = pool.find(v => v.name.toLowerCase().includes(persona.voiceNameHint!.toLowerCase()));
       if (hintMatch) return hintMatch;
     }
-    // Then match by language
-    const langMatch = voices.filter(v => v.lang.startsWith(persona.voiceLang.split("-")[0]));
-    return langMatch[0] || voices[0];
+
+    // Assign a unique voice per persona by index so each one sounds different
+    const personaIndex = voicePersonas.findIndex(v => v.id === persona.id);
+    return pool[personaIndex % pool.length];
   };
 
   const handlePlayPreview = (personaId: string) => {
