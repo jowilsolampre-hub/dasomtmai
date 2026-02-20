@@ -1,18 +1,11 @@
 import { useDevices } from "@/hooks/useDevices";
+import { useDeviceConnection } from "@/hooks/useDeviceConnection";
 import { useAuth } from "@/hooks/useAuth";
 import { CyberCard } from "../CyberCard";
 import { Button } from "@/components/ui/button";
 import { 
-  Smartphone, 
-  Monitor, 
-  Tablet, 
-  Trash2, 
-  RefreshCw, 
-  CheckCircle2,
-  Clock,
-  Wifi,
-  WifiOff,
-  LogIn
+  Smartphone, Monitor, Tablet, Trash2, RefreshCw, CheckCircle2,
+  Clock, Wifi, WifiOff, LogIn, Battery, BatteryCharging, Signal, Globe
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -20,23 +13,21 @@ import { useNavigate } from "react-router-dom";
 
 function getDeviceIcon(type: string) {
   switch (type) {
-    case "mobile":
-      return Smartphone;
-    case "tablet":
-      return Tablet;
-    default:
-      return Monitor;
+    case "mobile": return Smartphone;
+    case "tablet": return Tablet;
+    default: return Monitor;
   }
 }
 
 export function DevicesScreen() {
   const { devices, currentDeviceId, isLoading, removeDevice, refreshDevices } = useDevices();
+  const connection = useDeviceConnection();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   const handleRemoveDevice = async (deviceId: string, deviceName: string) => {
-    const { error } = await removeDevice(deviceId);
-    if (error) {
+    const result = await removeDevice(deviceId);
+    if (result?.error) {
       toast.error("Failed to remove device");
     } else {
       toast.success(`${deviceName} has been disconnected`);
@@ -52,12 +43,9 @@ export function DevicesScreen() {
           </div>
           <h2 className="font-orbitron text-xl text-foreground mb-2">Not Connected</h2>
           <p className="text-muted-foreground text-sm mb-6">
-            Sign in with Google to sync your devices and access your assistant everywhere.
+            Sign in to sync your devices and access your assistant everywhere.
           </p>
-          <Button 
-            onClick={() => navigate("/auth")}
-            className="bg-gradient-to-r from-primary to-accent"
-          >
+          <Button onClick={() => navigate("/auth")} className="bg-gradient-to-r from-primary to-accent">
             <LogIn className="w-4 h-4 mr-2" />
             Sign In to Connect
           </Button>
@@ -66,47 +54,62 @@ export function DevicesScreen() {
     );
   }
 
+  const DeviceTypeIcon = getDeviceIcon(connection.deviceType);
+
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-orbitron text-lg text-foreground">Connected Devices</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            {user?.email}
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">{user?.email}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={refreshDevices}
-          disabled={isLoading}
-          className="text-primary hover:text-primary/80"
-        >
+        <Button variant="ghost" size="icon" onClick={refreshDevices} disabled={isLoading} className="text-primary hover:text-primary/80">
           <RefreshCw className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
-      {/* Sync Status */}
+      {/* This Device Info */}
       <CyberCard variant="glow" className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
-            <Wifi className="w-5 h-5 text-accent" />
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+            <DeviceTypeIcon className="w-5 h-5 text-primary-foreground" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Device Sync Active</p>
+            <p className="text-sm font-medium text-foreground">This Device</p>
             <p className="text-xs text-muted-foreground">
-              {devices.length} device{devices.length !== 1 ? "s" : ""} connected
+              {connection.platform} · {connection.browser}
+              {connection.isNativeApp && " · Native App"}
             </p>
           </div>
-          <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
+          <div className={`w-3 h-3 rounded-full ${connection.isOnline ? "bg-accent animate-pulse" : "bg-destructive"}`} />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {/* Online status */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {connection.isOnline ? <Wifi className="w-3.5 h-3.5 text-accent" /> : <WifiOff className="w-3.5 h-3.5 text-destructive" />}
+            <span>{connection.isOnline ? "Online" : "Offline"}</span>
+          </div>
+
+          {/* Battery */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {connection.batteryCharging ? <BatteryCharging className="w-3.5 h-3.5 text-accent" /> : <Battery className="w-3.5 h-3.5" />}
+            <span>{connection.batteryLevel !== null ? `${connection.batteryLevel}%` : "N/A"}</span>
+          </div>
+
+          {/* Network type */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {connection.connectionType ? <Signal className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+            <span>{connection.connectionType?.toUpperCase() || "Web"}</span>
+          </div>
         </div>
       </CyberCard>
 
       {/* Device List */}
       <div className="space-y-3">
         <h3 className="text-sm font-tech text-muted-foreground uppercase tracking-wider">
-          Your Devices
+          All Devices · {devices.length}
         </h3>
 
         {isLoading ? (
@@ -131,36 +134,25 @@ export function DevicesScreen() {
           </CyberCard>
         ) : (
           devices.map((device) => {
-            const DeviceIcon = getDeviceIcon(device.device_type);
+            const Icon = getDeviceIcon(device.device_type);
             const isCurrent = device.id === currentDeviceId;
             const lastActive = formatDistanceToNow(new Date(device.last_active), { addSuffix: true });
 
             return (
-              <CyberCard 
-                key={device.id} 
-                variant={isCurrent ? "glow" : "default"}
-                className="p-4"
-              >
+              <CyberCard key={device.id} variant={isCurrent ? "glow" : "default"} className="p-4">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    isCurrent 
-                      ? "bg-gradient-to-br from-primary to-accent" 
-                      : "bg-secondary"
+                    isCurrent ? "bg-gradient-to-br from-primary to-accent" : "bg-secondary"
                   }`}>
-                    <DeviceIcon className={`w-6 h-6 ${
-                      isCurrent ? "text-primary-foreground" : "text-muted-foreground"
-                    }`} />
+                    <Icon className={`w-6 h-6 ${isCurrent ? "text-primary-foreground" : "text-muted-foreground"}`} />
                   </div>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {device.device_name}
-                      </p>
+                      <p className="text-sm font-medium text-foreground truncate">{device.device_name}</p>
                       {isCurrent && (
                         <span className="flex items-center gap-1 text-xs text-accent">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Current
+                          <CheckCircle2 className="w-3 h-3" /> Current
                         </span>
                       )}
                     </div>
@@ -171,12 +163,7 @@ export function DevicesScreen() {
                   </div>
 
                   {!isCurrent && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveDevice(device.id, device.device_name)}
-                      className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => handleRemoveDevice(device.id, device.device_name)} className="text-destructive hover:text-destructive/80 hover:bg-destructive/10">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
@@ -187,13 +174,14 @@ export function DevicesScreen() {
         )}
       </div>
 
-      {/* Info Section */}
+      {/* Info */}
       <CyberCard className="p-4 bg-secondary/30">
         <h4 className="text-sm font-medium text-foreground mb-2">About Device Sync</h4>
         <ul className="text-xs text-muted-foreground space-y-1">
-          <li>• Devices sync automatically when signed in with the same Google account</li>
-          <li>• Your conversations and preferences are shared across all devices</li>
-          <li>• Remove unused devices to keep your account secure</li>
+          <li>• Your assistant connects to whichever device you're using</li>
+          <li>• Conversations and preferences sync across all devices</li>
+          <li>• Battery and network status tracked in real-time</li>
+          <li>• Works in browser and as a native installed app</li>
         </ul>
       </CyberCard>
     </div>

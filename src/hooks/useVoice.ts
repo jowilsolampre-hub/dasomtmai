@@ -19,18 +19,16 @@ interface UseVoiceReturn {
   availableVoices: SpeechSynthesisVoice[];
 }
 
-const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+// Voice persona configs matching VoiceScreen
+const VOICE_PERSONAS: Record<string, { pitch: number; rate: number; voiceNameHint: string }> = {
+  "deep-male": { pitch: 0.7, rate: 0.85, voiceNameHint: "Daniel" },
+  "calm-female": { pitch: 1.08, rate: 0.9, voiceNameHint: "Samantha" },
+  "neutral-male": { pitch: 0.92, rate: 0.93, voiceNameHint: "Aaron" },
+};
 
-// Get the stored ElevenLabs voice ID from localStorage
-function getStoredVoiceId(): string {
-  try {
-    const stored = localStorage.getItem("dasom-voice-id");
-    if (stored) return stored;
-  } catch {
-    // ignore
-  }
-  // Default to "Brian" voice
-  return "nPczCjzI2devNBz1zQrb";
+function getStoredPersona() {
+  const id = localStorage.getItem("dasom-voice") || "deep-male";
+  return VOICE_PERSONAS[id] || VOICE_PERSONAS["deep-male"];
 }
 
 export function useVoice(config?: VoiceConfig): UseVoiceReturn {
@@ -41,11 +39,17 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Check browser support for speech recognition
   const isSupported = typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  // Load available voices
+  useEffect(() => {
+    const loadVoices = () => setAvailableVoices(window.speechSynthesis.getVoices());
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -95,26 +99,11 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
     };
   }, [isSupported]);
 
-  // Cleanup audio on unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
   const startListening = useCallback(() => {
     if (!recognitionRef.current || isListening) return;
     
-    // Stop any ongoing speech
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setIsSpeaking(false);
-    }
-    
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
     setTranscript("");
     setIsListening(true);
     
@@ -129,7 +118,6 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
 
   const stopListening = useCallback(() => {
     if (!recognitionRef.current) return;
-    
     try {
       recognitionRef.current.stop();
     } catch (error) {
@@ -138,63 +126,35 @@ export function useVoice(config?: VoiceConfig): UseVoiceReturn {
     setIsListening(false);
   }, []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback((text: string) => {
     if (!text.trim()) return;
 
-    // Stop any ongoing speech
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-
+    window.speechSynthesis.cancel();
     setIsSpeaking(true);
 
-    try {
-      const voiceId = getStoredVoiceId();
-      
-      const response = await fetch(TTS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ text, voiceId }),
-      });
+    const persona = getStoredPersona();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = persona.pitch;
+    utterance.rate = persona.rate;
 
-      if (!response.ok) {
-        throw new Error(`TTS request failed: ${response.status}`);
-      }
+    // Try to find the matching system voice
+    const allVoices = window.speechSynthesis.getVoices();
+    const enVoices = allVoices.filter(v => v.lang.startsWith("en"));
+    const pool = enVoices.length ? enVoices : allVoices;
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      audioRef.current = new Audio(audioUrl);
-      audioRef.current.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-        audioRef.current = null;
-      };
-      audioRef.current.onerror = () => {
-        console.error('Audio playback error');
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-        audioRef.current = null;
-      };
-      
-      await audioRef.current.play();
-    } catch (error) {
-      console.error('TTS error:', error);
-      setIsSpeaking(false);
-      // Fallback silently - don't show toast for TTS failures
-    }
+    const match = pool.find(v =>
+      v.name.toLowerCase().includes(persona.voiceNameHint.toLowerCase())
+    );
+    if (match) utterance.voice = match;
+
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
   }, []);
 
   const stopSpeaking = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    window.speechSynthesis.cancel();
     setIsSpeaking(false);
   }, []);
 
